@@ -1,96 +1,162 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
 import os
-import shutil
-from datetime import datetime
-from db import get_database, save_gst_rate, get_gst_rate, log_calculation
-from pdf_parser import parse_pdf_for_gst_rates, search_product_rate
+import re
+import datetime
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from rapidfuzz import process, fuzz
+from dotenv import load_dotenv
 
-app = FastAPI(title="GST Calculator API", version="1.0.0")
+# Load environment variables from .env file
+load_dotenv()
 
-# Enable CORS for frontend
+from db import rates_col, history_col, logs_col
+from pdf_parser import parse_pdf_tables
+
+app = FastAPI(title="GST Calculator Demo")
+
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure this properly for production
+    allow_origins=["*"],  # Allow all origins for development
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Ensure uploads directory exists
-os.makedirs("uploads", exist_ok=True)
+UPLOAD_DIR = "uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 @app.get("/")
 async def root():
-    return {"message": "GST Calculator API"}
+    return {"message": "GST Calculator API is running!", "version": "1.0.0", "endpoints": ["/docs", "/api/calc", "/admin/upload-pdf"]}
 
-@app.post("/upload-pdf")
-async def upload_pdf(file: UploadFile = File(...)):
-    """Upload and parse GST PDF for rate extraction"""
+@app.get("/test")
+async def test():
     try:
-        # Save uploaded file
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"gst_{timestamp}_{file.filename}"
-        file_path = os.path.join("uploads", filename)
+        # Test database connection
+        count = rates_col.count_documents({})
+        return {"status": "OK", "db_connection": "Success", "documents_count": count}
+    except Exception as e:
+        return {"status": "Error", "db_connection": "Failed", "error": str(e)}
+
+@app.post("/admin/upload-pdf")
+async def upload_pdf(file: UploadFile = File(...), admin_key: str = Form("")):
+    # Optional simple admin auth - disabled for testing
+    # expected_key = os.getenv("ADMIN_KEY")
+    # if expected_key and admin_key != expected_key:
+    #     raise HTTPException(status_code=403, detail=f"Invalid admin key. Expected: {expected_key}, Got: {admin_key}")
+
+    save_path = os.path.join(
+        UPLOAD_DIR,
+        f"{datetime.datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{file.filename}"
+    )
+    with open(save_path, "wb") as f:
+        f.write(await file.read())
+
+    # Parse PDF file
+    parsed = parse_pdf_tables(save_path)
+    if not parsed:
+        return JSONResponse({"ok": False, "message": "No rows parsed. Check PDF."})
+
+    updates = []
+    for hsn, desc, rate in parsed:
+        keywords = [w.lower() for w in re.findall(r"\w+", desc) if len(w) > 2][:20]
+        existing = rates_col.find_one({"hsn": hsn, "description": desc})
+        if existing:
+            if existing.get("rate") != rate:
+                history_col.insert_one({
+                    "hsn": hsn,
+                    "description": desc,
+                    "old_rate": existing.get("rate"),
+                    "new_rate": rate,
+                    "changed_at": datetime.datetime.utcnow(),
+                    "source_pdf": save_path
+                })
+                rates_col.update_one(
+                    {"_id": existing["_id"]},
+                    {"$set": {"rate": rate, "last_updated": datetime.datetime.utcnow(), "source_pdf": save_path}}
+                )
+                updates.append({"hsn": hsn, "old": existing.get("rate"), "new": rate})
+        else:
+            rates_col.insert_one({
+                "hsn": hsn,
+                "description": desc,
+                "keywords": keywords,
+                "rate": rate,
+                "last_updated": datetime.datetime.utcnow(),
+                "source_pdf": save_path
+            })
+            updates.append({"hsn": hsn, "old": None, "new": rate})
+
+    return {"ok": True, "parsed_rows": len(parsed), "updates": updates}
+
+# Calculator API Model
+class CalcRequest(BaseModel):
+    description: str
+    price: float
+    inclusive: bool = False
+    top_k: int = 3
+
+def calculate_gst(price, rate, inclusive=False):
+    r = float(rate)
+    if inclusive:
+        base = price / (1 + r/100)
+        gst = price - base
+        total = price
+    else:
+        gst = price * r/100
+        base = price
+        total = price + gst
+    return {"base": round(base,2), "gst": round(gst,2), "total": round(total,2)}
+
+@app.post("/api/calc")
+def api_calc(req: CalcRequest):
+    try:
+        q = req.description.lower()
         
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        # Check if database has any documents
+        all_docs = list(rates_col.find({}, {"description":1, "hsn":1, "rate":1}))
         
-        # Parse PDF and extract rates
-        rates = parse_pdf_for_gst_rates(file_path)
+        if not all_docs:
+            return {"matched": False, "error": "No GST rates found in database. Please upload a PDF first.", "suggestions": []}
         
-        # Save rates to database
-        db = get_database()
-        saved_count = 0
-        for rate in rates:
-            rate["source_pdf"] = file_path
-            save_gst_rate(db, rate)
-            saved_count += 1
-        
-        return {
-            "message": f"PDF processed successfully. {saved_count} rates saved.",
-            "filename": filename,
-            "rates_count": saved_count
-        }
+        descriptions = [d["description"] for d in all_docs]
+
+        match = process.extractOne(q, descriptions, scorer=fuzz.WRatio)
+        if match:
+            best_desc, score, idx = match
+            best_doc = all_docs[idx]
+        else:
+            best_doc = None
+            score = 0
+
+        if best_doc and score >= 65:
+            rate = best_doc["rate"]
+            calc = calculate_gst(req.price, rate, req.inclusive)
+            
+            # Log the calculation
+            try:
+                logs_col.insert_one({
+                    "input_description": req.description,
+                    "matched_description": best_doc["description"],
+                    "hsn": best_doc.get("hsn"),
+                    "rate": rate,
+                    "price": req.price,
+                    "inclusive": req.inclusive,
+                    "result": calc,
+                    "created_at": datetime.datetime.utcnow()
+                })
+            except Exception as log_error:
+                print(f"Failed to log calculation: {log_error}")
+            
+            return {"matched": True, "score": score, "match": best_doc, "calc": calc}
+        else:
+            suggestions = process.extract(q, descriptions, limit=req.top_k, scorer=fuzz.WRatio)
+            sug = [{"description": s[0], "score": s[1]} for s in suggestions]
+            return {"matched": False, "suggestions": sug}
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error processing PDF: {str(e)}")
-
-@app.get("/calculate/{product_name}")
-async def calculate_gst(product_name: str):
-    """Calculate GST rate for a product"""
-    try:
-        db = get_database()
-        rate_info = search_product_rate(db, product_name)
-        
-        if not rate_info:
-            return {"error": "Product not found", "rate": None}
-        
-        # Log the calculation
-        log_calculation(db, product_name, rate_info["rate"], rate_info["hsn"])
-        
-        return {
-            "product": product_name,
-            "hsn": rate_info["hsn"],
-            "description": rate_info["description"],
-            "rate": rate_info["rate"],
-            "matched": True
-        }
-    
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error calculating GST: {str(e)}")
-
-@app.get("/rates")
-async def get_all_rates(limit: int = 100):
-    """Get all GST rates"""
-    try:
-        db = get_database()
-        rates = list(db.gst_rates.find({}, {"_id": 0}).limit(limit))
-        return {"rates": rates, "count": len(rates)}
-    
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching rates: {str(e)}")
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+        print(f"Error in api_calc: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")

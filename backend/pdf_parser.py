@@ -1,100 +1,47 @@
 import pdfplumber
 import re
-from rapidfuzz import fuzz
-from typing import List, Dict, Optional
-from datetime import datetime
 
-def parse_pdf_for_gst_rates(pdf_path: str) -> List[Dict]:
-    """
-    Parse PDF and extract GST rates with HSN codes
-    Returns list of dictionaries with rate information
-    """
-    rates = []
-    
-    try:
-        with pdfplumber.open(pdf_path) as pdf:
-            for page_num, page in enumerate(pdf.pages):
-                text = page.extract_text()
-                if text:
-                    # Basic pattern matching for HSN codes and rates
-                    # This is a simplified version - you'll need to adjust based on actual PDF format
-                    lines = text.split('\n')
-                    
-                    for line in lines:
-                        # Look for patterns like: HSN_CODE DESCRIPTION RATE%
-                        hsn_match = re.search(r'(\d{4,8})\s+(.+?)\s+(\d+\.?\d*)%?', line)
-                        if hsn_match:
-                            hsn_code = hsn_match.group(1)
-                            description = hsn_match.group(2).strip()
-                            rate = float(hsn_match.group(3))
-                            
-                            # Extract keywords from description for fuzzy matching
-                            keywords = extract_keywords(description)
-                            
-                            rate_info = {
-                                "hsn": hsn_code,
-                                "description": description,
-                                "keywords": keywords,
-                                "rate": rate,
-                                "last_updated": datetime.now().isoformat(),
-                                "page_number": page_num + 1
-                            }
-                            rates.append(rate_info)
-    
-    except Exception as e:
-        print(f"Error parsing PDF: {e}")
-        return []
-    
-    return rates
+def parse_pdf_tables(path):
+    rows_out = []
+    with pdfplumber.open(path) as pdf:
+        for page in pdf.pages:
+            table = page.extract_table()
+            if table:
+                for row in table:
+                    row = [c.strip() if c else "" for c in row]
+                    rate = None
+                    hsn = None
+                    desc = None
 
-def extract_keywords(description: str) -> List[str]:
-    """
-    Extract keywords from product description for fuzzy matching
-    """
-    # Remove common words and split into keywords
-    stop_words = {'and', 'or', 'the', 'of', 'in', 'on', 'at', 'to', 'for', 'with', 'by'}
-    
-    # Clean and split description
-    words = re.findall(r'\b\w+\b', description.lower())
-    keywords = [word for word in words if len(word) > 2 and word not in stop_words]
-    
-    return keywords[:10]  # Limit to top 10 keywords
+                    # Find rate (last numeric column with %)
+                    for c in reversed(row):
+                        if c and re.search(r"\d+(\.\d+)?\s*%?", c):
+                            rate = re.sub(r"[^\d.]", "", c)
+                            break
 
-def search_product_rate(db, product_name: str, threshold: int = 70) -> Optional[Dict]:
-    """
-    Search for product GST rate using fuzzy matching
-    """
-    try:
-        # Get all rates from database
-        all_rates = list(db.gst_rates.find({}))
-        
-        best_match = None
-        best_score = 0
-        
-        product_lower = product_name.lower()
-        
-        for rate in all_rates:
-            # Check direct description match
-            desc_score = fuzz.partial_ratio(product_lower, rate['description'].lower())
-            
-            # Check keyword matches
-            keyword_scores = []
-            for keyword in rate.get('keywords', []):
-                keyword_score = fuzz.partial_ratio(product_lower, keyword)
-                keyword_scores.append(keyword_score)
-            
-            # Take the best keyword score
-            max_keyword_score = max(keyword_scores) if keyword_scores else 0
-            
-            # Combined score (weighted)
-            combined_score = max(desc_score * 0.7 + max_keyword_score * 0.3, max_keyword_score)
-            
-            if combined_score > best_score and combined_score >= threshold:
-                best_score = combined_score
-                best_match = rate
-        
-        return best_match
-    
-    except Exception as e:
-        print(f"Error searching product rate: {e}")
-        return None
+                    # Find HSN code (2-6 digits)
+                    for c in row:
+                        if c and re.search(r"\b\d{2,6}\b", c):
+                            hsn = re.search(r"\b\d{2,6}\b", c).group(0)
+                            break
+
+                    # Description: longest text cell
+                    lengths = [(i, len(c or "")) for i, c in enumerate(row)]
+                    if lengths:
+                        idx = max(lengths, key=lambda x: x[1])[0]
+                        desc = row[idx]
+
+                    if rate and desc:
+                        try:
+                            rows_out.append((hsn or "", desc, float(rate)))
+                        except:
+                            pass
+            else:
+                # fallback: text-based regex parsing if no tables
+                txt = page.extract_text() or ""
+                for line in txt.split("\n"):
+                    m = re.search(r"(\d{2,6})\s+(.{10,200}?)\s+(\d+(\.\d+)?)\s*%?$", line)
+                    if m:
+                        rows_out.append((m.group(1), m.group(2).strip(), float(m.group(3))))
+
+    return rows_out

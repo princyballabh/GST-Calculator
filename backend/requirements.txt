@@ -4,3 +4,4 @@ pymongo
 pdfplumber
 rapidfuzz
 python-multipart
+python-dotenv

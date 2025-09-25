@@ -49,13 +49,14 @@ GST-Calculator/
 
 ### Prerequisites
 
-- Python 3.8+ 
+- Python 3.8+
 - Node.js 16+
 - MongoDB Atlas account (or local MongoDB)
 
 ### 🔧 Setup Instructions
 
 #### 1. Clone & Environment Setup
+
 ```bash
 git clone https://github.com/princyballabh/GST-Calculator.git
 cd GST-Calculator
@@ -68,6 +69,7 @@ source .venv/bin/activate   # Linux/Mac
 ```
 
 #### 2. Backend Setup
+
 ```bash
 cd backend
 
@@ -83,6 +85,7 @@ python -m uvicorn test_server:app --reload --port 8003
 ```
 
 #### 3. Frontend Setup
+
 ```bash
 cd ../frontend
 
@@ -103,12 +106,14 @@ npm run dev
 ## 🔌 API Endpoints
 
 ### Main Endpoints (port 8003)
+
 - `GET /` - API health check
 - `POST /api/calc` - Calculate GST for product
 - `POST /api/upload` - Upload and parse GST PDF
 - `GET /debug/{product}` - Debug product matching
 
 ### Request Examples
+
 ```javascript
 // Calculate GST
 POST /api/calc
@@ -173,8 +178,9 @@ FormData: { file: gst_rates.pdf }
 ## 🎨 Color Palette & Design
 
 The application uses a sophisticated color scheme:
+
 - **Primary Dark**: `#6F1D1B` - Deep burgundy for headings
-- **Secondary**: `#BB9457` - Warm gold for accents  
+- **Secondary**: `#BB9457` - Warm gold for accents
 - **Tertiary**: `#432818` - Rich brown for text
 - **Accent**: `#99582A` - Medium brown for buttons
 - **Light**: `#FFE6A7` - Cream for backgrounds
@@ -182,6 +188,7 @@ The application uses a sophisticated color scheme:
 ## 🔒 Environment Variables
 
 Create `backend/.env` file (see `.env.example`):
+
 ```env
 MONGO_URL=your_mongodb_connection_string
 ADMIN_KEY=your_secure_admin_password
@@ -190,21 +197,23 @@ ADMIN_KEY=your_secure_admin_password
 ## 🗄️ Database Collections
 
 ### `rates_col` (GST Rates)
+
 ```json
 {
   "hsn": "0406",
-  "description": "Cheese, other than chena or paneer", 
+  "description": "Cheese, other than chena or paneer",
   "rate": 2.5,
   "keywords": ["cheese", "dairy"]
 }
 ```
 
 ### `history_col` (Rate Changes)
+
 ```json
 {
   "hsn": "0406",
   "old_rate": 5.0,
-  "new_rate": 2.5, 
+  "new_rate": 2.5,
   "changed_at": "2024-09-25T10:30:00Z"
 }
 ```
@@ -219,19 +228,21 @@ ADMIN_KEY=your_secure_admin_password
 ## 🚀 Deployment
 
 ### Production Build
+
 ```bash
 # Backend
 cd backend
 pip install -r requirements.txt
 python -m uvicorn test_server:app --host 0.0.0.0 --port 8003
 
-# Frontend  
+# Frontend
 cd frontend
 npm run build
 npm start
 ```
 
 ### Docker (Optional)
+
 ```dockerfile
 # See docker-compose.yml for containerized deployment
 ```
@@ -259,6 +270,7 @@ This project is licensed under the ISC License.
 ## 👤 Author
 
 **Princy Ballabh**
+
 - GitHub: [@princyballabh](https://github.com/princyballabh)
 
 ---

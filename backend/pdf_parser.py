@@ -25,11 +25,24 @@ def parse_pdf_tables(path):
                             hsn = re.search(r"\b\d{2,6}\b", c).group(0)
                             break
 
-                    # Description: longest text cell
-                    lengths = [(i, len(c or "")) for i, c in enumerate(row)]
-                    if lengths:
-                        idx = max(lengths, key=lambda x: x[1])[0]
-                        desc = row[idx]
+                    # Description: find the actual product description (not HSN codes)
+                    for c in row:
+                        if c and len(c) > 5:  # Must be meaningful length
+                            # Skip cells that are just HSN codes (pattern like "0101 21 00, 0101 29")
+                            if not re.match(r"^\d[\d\s,\.]+$", c):
+                                # Skip cells that are just serial numbers
+                                if not re.match(r"^\d+\.?$", c):
+                                    # Skip cells that are just rates
+                                    if not re.match(r"^\d+(\.\d+)?\s*%?$", c):
+                                        desc = c
+                                        break
+                    
+                    # Fallback to longest cell if no good description found
+                    if not desc:
+                        lengths = [(i, len(c or "")) for i, c in enumerate(row)]
+                        if lengths:
+                            idx = max(lengths, key=lambda x: x[1])[0]
+                            desc = row[idx]
 
                     if rate and desc:
                         try:

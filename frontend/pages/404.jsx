@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 
 export default function Custom404() {
   const styles = {
@@ -9,7 +9,7 @@ export default function Custom404() {
       fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
       display: "flex",
       alignItems: "center",
-      justifyContent: "center"
+      justifyContent: "center",
     },
     card: {
       maxWidth: "500px",
@@ -18,7 +18,7 @@ export default function Custom404() {
       padding: "3rem 2.5rem",
       boxShadow: "0 20px 40px rgba(0,0,0,0.3)",
       border: "2px solid #BB9457",
-      textAlign: "center"
+      textAlign: "center",
     },
     errorCode: {
       fontSize: "8rem",
@@ -26,25 +26,25 @@ export default function Custom404() {
       color: "#6F1D1B",
       marginBottom: "1rem",
       textShadow: "3px 3px 6px rgba(0,0,0,0.2)",
-      lineHeight: "1"
+      lineHeight: "1",
     },
     title: {
       color: "#6F1D1B",
       fontSize: "2.5rem",
       fontWeight: "bold",
       marginBottom: "1rem",
-      textShadow: "2px 2px 4px rgba(0,0,0,0.1)"
+      textShadow: "2px 2px 4px rgba(0,0,0,0.1)",
     },
     message: {
       color: "#99582A",
       fontSize: "1.2rem",
       marginBottom: "2.5rem",
-      lineHeight: "1.6"
+      lineHeight: "1.6",
     },
     buttonGroup: {
       display: "flex",
       flexDirection: "column",
-      gap: "1rem"
+      gap: "1rem",
     },
     button: {
       padding: "1.2rem",
@@ -59,16 +59,16 @@ export default function Custom404() {
       boxShadow: "0 6px 12px rgba(0,0,0,0.2)",
       textDecoration: "none",
       display: "inline-block",
-      textAlign: "center"
+      textAlign: "center",
     },
     secondaryButton: {
       backgroundColor: "#BB9457",
-      color: "#432818"
+      color: "#432818",
     },
     icon: {
       fontSize: "4rem",
-      marginBottom: "1rem"
-    }
+      marginBottom: "1rem",
+    },
   };
 
   return (
@@ -78,11 +78,11 @@ export default function Custom404() {
         <div style={styles.errorCode}>404</div>
         <h1 style={styles.title}>Page Not Found</h1>
         <p style={styles.message}>
-          Oops! The page you're looking for seems to have wandered off. 
-          Let's get you back to calculating those GST rates!
+          Oops! The page you're looking for seems to have wandered off. Let's
+          get you back to calculating those GST rates!
         </p>
         <div style={styles.buttonGroup}>
-          <a 
+          <a
             href="/"
             style={styles.button}
             onMouseEnter={(e) => {
@@ -98,9 +98,9 @@ export default function Custom404() {
           >
             🏠 Go Home
           </a>
-          <a 
+          <a
             href="/admin"
-            style={{...styles.button, ...styles.secondaryButton}}
+            style={{ ...styles.button, ...styles.secondaryButton }}
             onMouseEnter={(e) => {
               e.target.style.backgroundColor = "#99582A";
               e.target.style.color = "#FFE6A7";

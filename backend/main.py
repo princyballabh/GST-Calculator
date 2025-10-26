@@ -13,6 +13,7 @@ load_dotenv()
 
 from db import rates_col, history_col, logs_col
 from pdf_parser import parse_pdf_tables
+from seed_database import seed_database
 
 app = FastAPI(title="GST Calculator Demo")
 
@@ -28,9 +29,30 @@ app.add_middleware(
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+@app.on_event("startup")
+async def startup_event():
+    """Initialize database with seed data on startup"""
+    print("🚀 Starting GST Calculator API...")
+    seeded_count = seed_database()
+    if seeded_count > 0:
+        print(f"✅ Database initialized with {seeded_count} GST rates")
+    else:
+        print("📊 Database ready (no seeding required)")
+
 @app.get("/")
 async def root():
     return {"message": "GST Calculator API is running!", "version": "1.0.0", "endpoints": ["/docs", "/api/calc", "/admin/upload-pdf"]}
+
+@app.get("/api/status")
+async def get_status():
+    """Get database and application status"""
+    from seed_database import get_database_stats
+    stats = get_database_stats()
+    return {
+        "status": "running",
+        "database": stats,
+        "message": "GST Calculator ready for use" if stats.get("total_rates", 0) > 0 else "Upload PDF to populate database"
+    }
 
 @app.get("/test")
 async def test():

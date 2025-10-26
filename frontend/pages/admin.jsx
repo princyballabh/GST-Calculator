@@ -28,7 +28,7 @@ export default function AdminUpload() {
         `${
           process.env.NODE_ENV === "production"
             ? process.env.NEXT_PUBLIC_API_URL ||
-              "http://gst-calculator-production.up.railway.app"
+              "https://gst-calculator-production.up.railway.app"
             : "http://127.0.0.1:8000"
         }/admin/upload-pdf`,
         {

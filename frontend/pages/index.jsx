@@ -14,7 +14,7 @@ export default function GSTCalculator() {
     setResult(null);
     setSuggestions([]);
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/calc", {
+      const res = await fetch(`${process.env.NODE_ENV === 'production' ? process.env.NEXT_PUBLIC_API_URL || 'https://gst-calculator-backend-production.railway.app' : 'http://127.0.0.1:8000'}/api/calc`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ description, price: Number(price), inclusive }),

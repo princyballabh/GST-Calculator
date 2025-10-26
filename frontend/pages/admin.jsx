@@ -24,10 +24,18 @@ export default function AdminUpload() {
     const fd = new FormData();
     fd.append("file", file);
     try {
-      const res = await fetch(`${process.env.NODE_ENV === 'production' ? process.env.NEXT_PUBLIC_API_URL || 'https://gst-calculator-backend-production.railway.app' : 'http://127.0.0.1:8000'}/admin/upload-pdf`, {
-        method: "POST",
-        body: fd,
-      });
+      const res = await fetch(
+        `${
+          process.env.NODE_ENV === "production"
+            ? process.env.NEXT_PUBLIC_API_URL ||
+              "http://gst-calculator-production.up.railway.app"
+            : "http://127.0.0.1:8000"
+        }/admin/upload-pdf`,
+        {
+          method: "POST",
+          body: fd,
+        }
+      );
       const data = await res.json();
       console.log("Upload response:", data);
       setUploadResult(data);

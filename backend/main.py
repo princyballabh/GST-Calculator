@@ -60,10 +60,14 @@ async def health_check():
             "timestamp": datetime.datetime.utcnow().isoformat()
         }
     except Exception as e:
+        # Include environment info for debugging
+        mongo_url = os.getenv("MONGO_URL", "NOT_SET")
         return {
             "status": "unhealthy",
             "database": "disconnected",
             "error": str(e),
+            "mongo_url_configured": mongo_url != "NOT_SET",
+            "mongo_url_preview": mongo_url[:20] + "..." if mongo_url != "NOT_SET" else "NOT_SET",
             "timestamp": datetime.datetime.utcnow().isoformat()
         }
 

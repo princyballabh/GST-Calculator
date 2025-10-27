@@ -20,7 +20,11 @@ app = FastAPI(title="GST Calculator Demo")
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # For dev, or ["http://localhost:3000"] for strict mode
+    allow_origins=[
+        "http://localhost:3000",
+        "https://gst-calculator.up.railway.app",
+        "*"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -42,6 +46,26 @@ async def startup_event():
 @app.get("/")
 async def root():
     return {"message": "GST Calculator API is running!", "version": "1.0.0", "endpoints": ["/docs", "/api/calc", "/admin/upload-pdf"]}
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for Railway deployment"""
+    try:
+        # Test MongoDB connection
+        count = rates_col.count_documents({})
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "rates_count": count,
+            "timestamp": datetime.datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "database": "disconnected",
+            "error": str(e),
+            "timestamp": datetime.datetime.utcnow().isoformat()
+        }
 
 @app.get("/api/status")
 async def get_status():

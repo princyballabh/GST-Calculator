@@ -4,7 +4,7 @@ A professional web application for calculating GST rates with elegant UI/UX, PDF
 
 ## ✨ Features
 
-- 🎨 **Beautiful UI/UX**: Modern, responsive design with elegant color scheme
+- 🎨 **Beautiful UI/UX**: Modern, responsive design with an elegant color scheme
 - 📄 **PDF Upload**: Parse GST rate PDFs and automatically update database
 - 🔍 **Smart Matching**: Fuzzy matching to find best GST rates for products
 - 🔐 **Admin Panel**: Secure admin interface for rate management
